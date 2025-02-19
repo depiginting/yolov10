@@ -528,10 +528,88 @@ def compute_ap(recall, precision):
 
     return ap, mpre, mrec
 
-
 def ap_per_class(
     tp, conf, pred_cls, target_cls, plot=False, on_plot=None, save_dir=Path(), names=(), eps=1e-16, prefix=""
 ):
+    """
+    Computes the average precision per class for object detection evaluation.
+    Additionally, computes AUC-ROC and AUC-PR.
+
+    Returns:
+        (tuple): Returns the original metrics plus:
+            - auc_roc: AUC-ROC score for each class.
+            - auc_pr: AUC-PR score for each class.
+    """
+
+    # Sort by objectness score (confidence)
+    i = np.argsort(-conf)
+    tp, conf, pred_cls = tp[i], conf[i], pred_cls[i]
+
+    # Find unique classes
+    unique_classes, nt = np.unique(target_cls, return_counts=True)
+    nc = unique_classes.shape[0]  # Number of classes
+
+    # Initialize arrays
+    x = np.linspace(0, 1, 1000)
+    prec_values = []
+
+    ap, p_curve, r_curve = np.zeros((nc, tp.shape[1])), np.zeros((nc, 1000)), np.zeros((nc, 1000))
+    auc_roc, auc_pr = np.zeros(nc), np.zeros(nc)  # AUC-ROC & AUC-PR
+
+    for ci, c in enumerate(unique_classes):
+        i = pred_cls == c
+        n_l = nt[ci]  # Number of ground truths
+        n_p = i.sum()  # Number of predictions
+        if n_p == 0 or n_l == 0:
+            continue
+
+        # Compute cumulative TP and FP
+        fpc = (1 - tp[i]).cumsum(0)
+        tpc = tp[i].cumsum(0)
+
+        # Compute Recall and Precision
+        recall = tpc / (n_l + eps)  # Recall curve
+        precision = tpc / (tpc + fpc + eps)  # Precision curve
+
+        # Interpolate curves
+        r_curve[ci] = np.interp(-x, -conf[i], recall[:, 0], left=0)
+        p_curve[ci] = np.interp(-x, -conf[i], precision[:, 0], left=1)
+
+        # Compute AP
+        for j in range(tp.shape[1]):
+            ap[ci, j], mpre, mrec = compute_ap(recall[:, j], precision[:, j])
+            if plot and j == 0:
+                prec_values.append(np.interp(x, mrec, mpre))  
+
+        # Compute AUC-PR
+        auc_pr[ci] = np.trapz(precision[:, 0], recall[:, 0])  # Area under Precision-Recall curve
+
+        # Compute AUC-ROC
+        fpr = fpc / (fpc[-1] + eps)  # False Positive Rate (FPR)
+        tpr = tpc / (tpc[-1] + eps)  # True Positive Rate (TPR)
+        auc_roc[ci] = np.trapz(tpr[:, 0], fpr[:, 0])  # Area under ROC curve
+
+    prec_values = np.array(prec_values)  
+
+    # Compute F1-Score
+    f1_curve = 2 * p_curve * r_curve / (p_curve + r_curve + eps)
+
+    # Plot curves if requested
+    if plot:
+        plot_pr_curve(x, prec_values, ap, save_dir / f"{prefix}PR_curve.png", names, on_plot=on_plot)
+        plot_mc_curve(x, f1_curve, save_dir / f"{prefix}F1_curve.png", names, ylabel="F1", on_plot=on_plot)
+        plot_mc_curve(x, p_curve, save_dir / f"{prefix}P_curve.png", names, ylabel="Precision", on_plot=on_plot)
+        plot_mc_curve(x, r_curve, save_dir / f"{prefix}R_curve.png", names, ylabel="Recall", on_plot=on_plot)
+
+    # Find max-F1 index
+    i = smooth(f1_curve.mean(0), 0.1).argmax()
+    p, r, f1 = p_curve[:, i], r_curve[:, i], f1_curve[:, i]  
+    tp = (r * nt).round()  
+    fp = (tp / (p + eps) - tp).round()  
+
+    return tp, fp, p, r, f1, ap, unique_classes.astype(int), p_curve, r_curve, f1_curve, x, prec_values, auc_roc, auc_pr
+
+
     """
     Computes the average precision per class for object detection evaluation.
 
