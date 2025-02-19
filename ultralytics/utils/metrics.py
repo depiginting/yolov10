@@ -437,6 +437,32 @@ class ConfusionMatrix:
         for i in range(self.nc + 1):
             LOGGER.info(" ".join(map(str, self.matrix[i])))
 
+    def save_csv(self, save_path="confusion_matrix.csv", class_names=None):
+        """
+        Save the confusion matrix as a CSV file.
+
+        Args:
+            save_path (str): Path where the CSV file will be saved.
+            class_names (list): Optional list of class names for labeling.
+        """
+        save_path = Path(save_path)
+
+        # Menentukan label kelas (termasuk background jika ada)
+        if class_names is None:
+            class_names = [f"Class_{i}" for i in range(self.nc)] + ["background"]
+        elif self.task == "detect":
+            class_names.append("background")  # Tambahkan background untuk deteksi
+
+        # Pastikan ukuran label sesuai dengan matriks
+        assert len(class_names) == self.matrix.shape[0], "Jumlah nama kelas tidak sesuai dengan matriks."
+
+        # Buat DataFrame
+        df = pd.DataFrame(self.matrix, index=class_names, columns=class_names)
+
+        # Simpan ke CSV
+        df.to_csv(save_path)
+
+        print(f"Confusion matrix saved to: {save_path}")
 
 def smooth(y, f=0.05):
     """Box filter of fraction f."""
@@ -469,9 +495,6 @@ def plot_pr_curve(px, py, ap, save_dir=Path("pr_curve.png"), names=(), on_plot=N
     plt.close(fig)
     if on_plot:
         on_plot(save_dir)
-        
-    data_points = np.column_stack((px, py.mean(1)))
-    np.savetxt(save_dir.with_suffix(".csv"), data_points, delimiter=",")
 
 @plt_settings()
 def plot_mc_curve(px, py, save_dir=Path("mc_curve.png"), names=(), xlabel="Confidence", ylabel="Metric", on_plot=None):
@@ -496,9 +519,6 @@ def plot_mc_curve(px, py, save_dir=Path("mc_curve.png"), names=(), xlabel="Confi
     plt.close(fig)
     if on_plot:
         on_plot(save_dir)
-    
-    data_points = np.column_stack((px, py.mean(1)))
-    np.savetxt(save_dir.with_suffix(".csv"), data_points, delimiter=",")
 
 
 def compute_ap(recall, precision):
