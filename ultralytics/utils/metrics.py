@@ -469,7 +469,9 @@ def plot_pr_curve(px, py, ap, save_dir=Path("pr_curve.png"), names=(), on_plot=N
     plt.close(fig)
     if on_plot:
         on_plot(save_dir)
-
+        
+    data_points = np.column_stack((px, py.mean(1)))
+    np.savetxt(save_dir.with_suffix(".csv"), data_points, delimiter=",")
 
 @plt_settings()
 def plot_mc_curve(px, py, save_dir=Path("mc_curve.png"), names=(), xlabel="Confidence", ylabel="Metric", on_plot=None):
@@ -494,6 +496,9 @@ def plot_mc_curve(px, py, save_dir=Path("mc_curve.png"), names=(), xlabel="Confi
     plt.close(fig)
     if on_plot:
         on_plot(save_dir)
+    
+    data_points = np.column_stack((px, py.mean(1)))
+    np.savetxt(save_dir.with_suffix(".csv"), data_points, delimiter=",")
 
 
 def compute_ap(recall, precision):
