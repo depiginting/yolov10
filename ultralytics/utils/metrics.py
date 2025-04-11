@@ -496,6 +496,33 @@ def plot_pr_curve(px, py, ap, save_dir=Path("pr_curve.png"), names=(), on_plot=N
     if on_plot:
         on_plot(save_dir)
 
+########################################
+
+def save_pr_to_csv(px, py, ap, names, save_dir):
+    import csv
+    from pathlib import Path
+
+    # ✅ konversi list ke dict agar names[i] tidak error
+    names = dict(enumerate(names)) if not isinstance(names, dict) else names
+
+    csv_path = Path(save_dir).with_suffix('.csv')  # .png → .csv
+    py = np.stack(py, axis=1)
+
+    with open(csv_path, mode='w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['Class', 'Recall', 'Precision'])
+
+        if 0 < len(names) < 21:
+            for i, y in enumerate(py.T):  # per kelas
+                for r, p in zip(px, y):
+                    writer.writerow([names[i], r, p])
+        else:
+            for r, p in zip(px, py.mean(1)):
+                writer.writerow(['all_classes', r, p])
+
+
+
+##############################################
 @plt_settings()
 def plot_mc_curve(px, py, save_dir=Path("mc_curve.png"), names=(), xlabel="Confidence", ylabel="Metric", on_plot=None):
     """Plots a metric-confidence curve."""
