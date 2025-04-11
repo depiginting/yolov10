@@ -492,6 +492,7 @@ def plot_pr_curve(px, py, ap, save_dir=Path("pr_curve.png"), names=(), on_plot=N
     ax.legend(bbox_to_anchor=(1.04, 1), loc="upper left")
     ax.set_title("Precision-Recall Curve")
     fig.savefig(save_dir, dpi=250)
+    save_pr_to_csv(px, py, ap, names, save_dir)
     plt.close(fig)
     if on_plot:
         on_plot(save_dir)
